@@ -1,0 +1,45 @@
+name: CI
+
+on:
+    pull_request:
+        types: [closed]
+        branches: [jdbc]
+
+jobs:
+    build:
+        ## Found on https://stackoverflow.com/questions/62191612/how-to-trigger-github-ci-once-pr-get-merged
+        if: github.event.pull_request.merged == true
+        runs-on: ubuntu-latest
+
+        services:
+            mysql:
+                image: mysql:8.0
+                env:
+                    MYSQL_ROOT_PASSWORD: password
+                    MYSQL_DATABASE: mn_playground
+                ports:
+                    - 3306:3306
+                ## Avoid race condition
+                options: >-
+                    --health-cmd="mysqladmin ping"
+                    --health-interval=10s
+                    --health-timeout=5s
+                    --health-retries=5
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Set up JDK 21
+              uses: actions/setup-java@v4
+              with:
+                  java-version: "21"
+                  distribution: "temurin"
+
+            - name: Setup Gradle
+              uses: gradle/actions/setup-gradle@v3
+
+            - name: Build Gradle
+              run: ./gradlew build
+              env:
+                  ## Since the default in application.yaml is jdbc:mysql://10.11.12.28:3306/mn_playground
+                  DATASOURCES_DEFAULT_URL: jdbc:mysql://127.0.0.1:3306/mn_playground
